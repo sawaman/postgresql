@@ -1042,10 +1042,10 @@ ValidateSlotSyncParams(int elevel)
 	 * Since altering the wal_level requires a server restart, so error out in
 	 * this case regardless of elevel provided by caller.
 	 */
-	if (XLogLogicalInfoActive())
+	if (!XLogLogicalInfoActive())
 		ereport(ERROR,
 				errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				errmsg("replication slot synchronization requires \"wal_level\" >= \"logical\""));
+				errmsg("replication slot synchronization requires \"wal_level\" >= \"logical\" or to activate logical decoding"));
 
 	/*
 	 * A physical replication slot(primary_slot_name) is required on the

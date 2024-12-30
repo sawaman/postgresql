@@ -167,7 +167,7 @@ xlog_desc(StringInfo buf, XLogReaderState *record)
 		memcpy(&wal_level, rec, sizeof(int));
 		appendStringInfo(buf, "wal_level %s", get_wal_level_string(wal_level));
 	}
-	else if (info == XLOG_LOGICAL_DECODING_STATE)
+	else if (info == XLOG_LOGICAL_DECODING_STATUS)
 	{
 		bool		logical_decoding;
 
@@ -225,8 +225,8 @@ xlog_identify(uint8 info)
 		case XLOG_CHECKPOINT_REDO:
 			id = "CHECKPOINT_REDO";
 			break;
-		case XLOG_LOGICAL_DECODING_STATE:
-			id = "LOGICAL_DECODING_STATE";
+		case XLOG_LOGICAL_DECODING_STATUS:
+			id = "LOGICAL_DECODING_STATUS";
 			break;
 	}
 

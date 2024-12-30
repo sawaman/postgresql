@@ -81,7 +81,7 @@ typedef struct CheckPoint
 /* 0xC0 is used in Postgres 9.5-11 */
 #define XLOG_OVERWRITE_CONTRECORD		0xD0
 #define XLOG_CHECKPOINT_REDO			0xE0
-#define XLOG_LOGICAL_DECODING_STATE		0xF0
+#define XLOG_LOGICAL_DECODING_STATUS	0xF0
 
 
 /*

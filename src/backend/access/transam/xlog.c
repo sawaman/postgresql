@@ -5595,7 +5595,11 @@ StartupXLOG(void)
 	 */
 	RelationCacheInitFileRemove();
 
-	StartupLogicalDecodingState(checkPoint.logicalDecoding);
+	/*
+	 * Initialize logical decoding status, before initializing replication
+	 * slots.
+	 */
+	StartupLogicalDecodingStatus(checkPoint.logicalDecoding);
 
 	/*
 	 * Initialize replication slots, before there's a chance to remove
@@ -8587,7 +8591,7 @@ xlog_redo(XLogReaderState *record)
 	{
 		/* nothing to do here, just for informational purposes */
 	}
-	else if (info == XLOG_LOGICAL_DECODING_STATE)
+	else if (info == XLOG_LOGICAL_DECODING_STATUS)
 	{
 		bool		enabled;
 
@@ -8608,7 +8612,7 @@ xlog_redo(XLogReaderState *record)
 											   0, InvalidOid,
 											   InvalidTransactionId);
 
-		UpdateLogicalDecodingState(enabled);
+		UpdateLogicalDecodingStatus(enabled);
 	}
 }
 

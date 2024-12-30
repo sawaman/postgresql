@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  * logicalxlog.c
  *	   This module contains the codes for enabling or disabling to include
- *	   logical information into WAL records.
+ *	   logical information into WAL records and logical decoding.
  *
  * Copyright (c) 2012-2024, PostgreSQL Global Development Group
  *
@@ -31,18 +31,18 @@
 
 typedef struct XLogLogicalInfoCtlData
 {
-	LogicalDecodingState state;
+	LogicalDecodingStatus status;
 	slock_t		mutex;
-
 	ConditionVariable		cv;
 } XLogLogicalInfoCtlData;
-
-/*
- *
- */
 XLogLogicalInfoCtlData *XLogLogicalInfoCtl = NULL;
 
 static void logical_decoding_activation_abort_callback(int code, Datum arg);
+static void do_activate_logical_decoding(void);
+
+/*
+ * Initialization of shared memory.
+ */
 
 Size
 LogicalXlogShmemSize(void)
@@ -61,7 +61,7 @@ LogicalXlogShmemInit(void)
 
 	if (!found)
 	{
-		XLogLogicalInfoCtl->state = LOGICAL_DECODING_STATE_DISABLED;
+		XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_DISABLED;
 		SpinLockInit(&XLogLogicalInfoCtl->mutex);
 		ConditionVariableInit(&XLogLogicalInfoCtl->cv);
 	}
@@ -72,18 +72,22 @@ LogicalXlogShmemInit(void)
  * before calling StartupReplicationSlots().
  */
 void
-StartupLogicalDecodingState(bool enabled_at_last_checkpoint)
+StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 {
-	LogicalDecodingState state;
+	LogicalDecodingStatus status;
+
+	elog(LOG, "XXX logical dec was enabled? %d, wal_level %d",
+		 enabled_at_last_checkpoint,
+		 wal_level);
 
 	if (enabled_at_last_checkpoint)
-		state = LOGICAL_DECODING_STATE_READY;
+		status = LOGICAL_DECODING_STATUS_READY;
 	else
-		state = LOGICAL_DECODING_STATE_DISABLED;
+		status = LOGICAL_DECODING_STATUS_DISABLED;
 
 	/*
-	 * On standbys, we always start with the state in the last checkpoint
-	 * record. If changes of wal_level or logical decoding state is sent
+	 * On standbys, we always start with the status in the last checkpoint
+	 * record. If changes of wal_level or logical decoding status is sent
 	 * from the primary, we will enable or disable the logical decoding
 	 * while replaying the WAL record and invalidate slots if necessary.
 	 */
@@ -91,71 +95,41 @@ StartupLogicalDecodingState(bool enabled_at_last_checkpoint)
 	{
 		/*
 		 * Disable logical decoding if replication slots are not available.
-		 * If there are replication slots serialized on the disk, we will
-		 * error out when restoring them.
 		 */
 		if (max_replication_slots == 0)
-			state = LOGICAL_DECODING_STATE_DISABLED;
+			status = LOGICAL_DECODING_STATUS_DISABLED;
 
 		/*
 		 * If previously the logical decoding was active but the server
 		 * restarted with wal_level < 'replica', we disable the logical
-		 * decoding. If there are replication slots serialized on the disk
-		 * we will error out when restoring them.
+		 * decoding.
 		 */
 		if (wal_level < WAL_LEVEL_REPLICA)
-			state = LOGICAL_DECODING_STATE_DISABLED;
+			status = LOGICAL_DECODING_STATUS_DISABLED;
 
 		/*
 		 * Setting wal_level to 'logical' immediately enables logical
 		 * decoding and WAL-logging logical info.
 		 */
 		if (wal_level >= WAL_LEVEL_LOGICAL)
-		{
-			elog(LOG, "XXX immdeitaly enable wal_level >= LOGICAL");
-			state = LOGICAL_DECODING_STATE_READY;
-		}
+			status = LOGICAL_DECODING_STATUS_READY;
 	}
 
-	XLogLogicalInfoCtl->state = state;
-
-	/*
-	if (state == LOGICAL_DECODING_STATE_READY)
-	{
-		uint64 generation;
-
-		generation = EmitProcSignalBarrier(PROCSIGNAL_BARRIER_UPDATELOGICALINFO);
-
-		if (IsUnderPostmaster)
-			WaitForProcSignalBarrier(generation);
-	}
-	*/
+	XLogLogicalInfoCtl->status = status;
 }
 
 /*
  */
 void
-UpdateLogicalDecodingState(bool activate)
+UpdateLogicalDecodingStatus(bool activate)
 {
-	XLogLogicalInfoCtl->state = activate
-		? LOGICAL_DECODING_STATE_READY
-		: LOGICAL_DECODING_STATE_DISABLED;
-
-	EmitProcSignalBarrier(PROCSIGNAL_BARRIER_UPDATELOGICALINFO);
-}
-
-bool
-ProcessBarrierUpdateLogicalInfo(void)
-{
-	//XlogLogicalInfoUpdateLocal();
-	//elog(LOG, "XXX absorb global barrier now enabled? %d",
-	//XLogLogicalInfo);
-
-	return true;
+	XLogLogicalInfoCtl->status = activate
+		? LOGICAL_DECODING_STATUS_READY
+		: LOGICAL_DECODING_STATUS_DISABLED;
 }
 
 bool inline
-IsXLogLogicalInfoActive(void)
+XLogLogicalInfoEnabled(void)
 {
 	/*
 	 * Use volatile pointer to make sure we make a fresh read of
@@ -163,7 +137,7 @@ IsXLogLogicalInfoActive(void)
 	 */
 	volatile XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
 
-	return ctl->state >= LOGICAL_DECODING_STATE_XLOG_LOGICALINFO;
+	return ctl->status >= LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO;
 }
 
 bool inline
@@ -175,62 +149,11 @@ IsLogicalDecodingActive(void)
 	 */
 	volatile XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
 
-	return ctl->state == LOGICAL_DECODING_STATE_READY;
+	return ctl->status == LOGICAL_DECODING_STATUS_READY;
 }
 
-void
-EnsureLogicalDecodingActive(void)
-{
-	LogicalDecodingState state;
-
-	if (max_replication_slots == 0)
-		return;
-
-	SpinLockAcquire(&(XLogLogicalInfoCtl->mutex));
-	state = XLogLogicalInfoCtl->state;
-	SpinLockRelease(&(XLogLogicalInfoCtl->mutex));
-
-	if (state == LOGICAL_DECODING_STATE_READY)
-		return;
-
-	/*
-	 * Get ready to sleep until the logical decoding gets activated.
-	 * We may end up not sleeping, but we don't want to do this while
-	 * holding the spinlock.
-	 */
-	ConditionVariablePrepareToSleep(&XLogLogicalInfoCtl->cv);
-
-	for (;;)
-	{
-		SpinLockAcquire(&XLogLogicalInfoCtl->mutex);
-		state = XLogLogicalInfoCtl->state;
-		SpinLockRelease(&XLogLogicalInfoCtl->mutex);
-
-		/* Return if the logical decoding is activated */
-		if (state == LOGICAL_DECODING_STATE_READY)
-			return;
-
-		if (state == LOGICAL_DECODING_STATE_XLOG_LOGICALINFO)
-		{
-			/*
-			 * Someone has already started the activation process. Wait
-			 * for the activation to complete and check the status again.
-			 */
-			ConditionVariableSleep(&XLogLogicalInfoCtl->cv,
-								   WAIT_EVENT_LOGICAL_DECODING_ACTIVATION);
-
-			continue;
-		}
-
-		/* Activate logical decoding */
-		ActivateLogicalDecoding();
-	}
-
-	ConditionVariableCancelSleep();
-}
-
-void
-ActivateLogicalDecoding(void)
+static void
+do_activate_logical_decoding(void)
 {
 	bool recoveryInProgress = RecoveryInProgress();
 
@@ -243,16 +166,13 @@ ActivateLogicalDecoding(void)
 				(errcode(ERRCODE_ACTIVE_SQL_TRANSACTION),
 				 errmsg("cannot activate logical decoding in transaction that has performed writes")));
 
-	elog(LOG, "XXX start activating logical decoding");
-
 	/*
 	 * Get the latest status of logical info logging. If it's already
 	 * activated, quick return.
 	 */
 	SpinLockAcquire(&XLogLogicalInfoCtl->mutex);
-	if (XLogLogicalInfoCtl->state >= LOGICAL_DECODING_STATE_XLOG_LOGICALINFO)
+	if (XLogLogicalInfoCtl->status >= LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO)
 	{
-		elog(LOG, "XXX early return state %d", XLogLogicalInfoCtl->state);
 		SpinLockRelease(&XLogLogicalInfoCtl->mutex);
 		return;
 	}
@@ -260,17 +180,12 @@ ActivateLogicalDecoding(void)
 	/*
 	 * Activate the logical info logging first.
 	 */
-	XLogLogicalInfoCtl->state = LOGICAL_DECODING_STATE_XLOG_LOGICALINFO;
+	XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO;
 	SpinLockRelease(&XLogLogicalInfoCtl->mutex);
-	elog(LOG, "XXX enable logical info logging %d", XLogLogicalInfoCtl->state);
 
 	PG_ENSURE_ERROR_CLEANUP(logical_decoding_activation_abort_callback, 0);
 	{
 		RunningTransactions running_xacts;
-
-		elog(LOG, "XXX sent PROCSIGNAL_BARRIER_UPDATELOGICALINFO signal");
-		WaitForProcSignalBarrier(
-			EmitProcSignalBarrier(PROCSIGNAL_BARRIER_UPDATELOGICALINFO));
 
 		running_xacts = GetRunningTransactionData();
 
@@ -286,18 +201,15 @@ ActivateLogicalDecoding(void)
 			TransactionId xid = running_xacts->xids[i];
 
 			/*
-			 * Upper layers should prevent that we ever need to wait on ourselves.
-			 * Check anyway, since failing to do so would either result in an
-			 * endless wait or an Assert() failure.
+			 * Upper layers should prevent that we ever need to wait on
+			 * ourselves. Check anyway, since failing to do so would either
+			 * result in an endless wait or an Assert() failure.
 			 */
 			if (TransactionIdIsCurrentTransactionId(xid))
 				elog(ERROR, "waiting for ourselves");
 
-			elog(LOG, "XXX wait for xid %u to finish...", xid);
 			XactLockTableWait(xid, NULL, NULL, XLTW_None);
 		}
-
-		elog(LOG, "XXX confirmed all txs finished!");
 	}
 	PG_END_ENSURE_ERROR_CLEANUP(logical_decoding_activation_abort_callback, 0);
 
@@ -305,10 +217,8 @@ ActivateLogicalDecoding(void)
 
 	/* Activate logical decoding on the database cluster */
 	SpinLockAcquire(&XLogLogicalInfoCtl->mutex);
-	XLogLogicalInfoCtl->state = LOGICAL_DECODING_STATE_READY;
+	XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_READY;
 	SpinLockRelease(&XLogLogicalInfoCtl->mutex);
-
-	elog(LOG, "XXX enable logical decoding!!");
 
 	if (XLogStandbyInfoActive() && !recoveryInProgress)
 	{
@@ -317,7 +227,7 @@ ActivateLogicalDecoding(void)
 		XLogBeginInsert();
 		XLogRegisterData((char *) (&enabled), sizeof(bool));
 
-		XLogInsert(RM_XLOG_ID, XLOG_LOGICAL_DECODING_STATE);
+		XLogInsert(RM_XLOG_ID, XLOG_LOGICAL_DECODING_STATUS);
 	}
 
 	END_CRIT_SECTION();
@@ -330,7 +240,7 @@ static void
 logical_decoding_activation_abort_callback(int code, Datum arg)
 {
 	SpinLockAcquire(&XLogLogicalInfoCtl->mutex);
-	XLogLogicalInfoCtl->state = LOGICAL_DECODING_STATE_DISABLED;
+	XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_DISABLED;
 	SpinLockRelease(&XLogLogicalInfoCtl->mutex);
 
 	/* Let everybody know we failed to activate the logical decoding */
@@ -340,7 +250,56 @@ logical_decoding_activation_abort_callback(int code, Datum arg)
 Datum
 pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 {
-	EnsureLogicalDecodingActive();
+	LogicalDecodingStatus status;
+
+	if (max_replication_slots == 0)
+		ereport(LOG,
+				(errmsg("logical decoding can only be activated if \"max_replication_slots\" > 0")));
+	if (wal_level < WAL_LEVEL_REPLICA)
+		ereport(LOG,
+				(errmsg("logical decoding can only be activated if \"wal_level\" >= \"replica\"")));
+
+	SpinLockAcquire(&(XLogLogicalInfoCtl->mutex));
+	status = XLogLogicalInfoCtl->status;
+	SpinLockRelease(&(XLogLogicalInfoCtl->mutex));
+
+	if (status == LOGICAL_DECODING_STATUS_READY)
+		PG_RETURN_VOID();
+
+	/*
+	 * Get ready to sleep until the logical decoding gets activated.
+	 * We may end up not sleeping, but we don't want to do this while
+	 * holding the spinlock.
+	 */
+	ConditionVariablePrepareToSleep(&XLogLogicalInfoCtl->cv);
+
+	for (;;)
+	{
+		SpinLockAcquire(&XLogLogicalInfoCtl->mutex);
+		status = XLogLogicalInfoCtl->status;
+		SpinLockRelease(&XLogLogicalInfoCtl->mutex);
+
+		/* Return if the logical decoding is activated */
+		if (status == LOGICAL_DECODING_STATUS_READY)
+			break;
+
+		if (status == LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO)
+		{
+			/*
+			 * Someone has already started the activation process. Wait
+			 * for the activation to complete and check the status again.
+			 */
+			ConditionVariableSleep(&XLogLogicalInfoCtl->cv,
+								   WAIT_EVENT_LOGICAL_DECODING_ACTIVATION);
+
+			continue;
+		}
+
+		/* Activate logical decoding */
+		do_activate_logical_decoding();
+	}
+
+	ConditionVariableCancelSleep();
 
 	PG_RETURN_VOID();
 }
@@ -348,7 +307,6 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 Datum
 pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 {
-	bool deactivated;
 	int	active_logical_slots = 0;
 	bool recoveryInProgress = RecoveryInProgress();
 
@@ -381,39 +339,41 @@ pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 		XLogBeginInsert();
 		XLogRegisterData((char *) (&enabled), sizeof(bool));
 
-		XLogInsert(RM_XLOG_ID, XLOG_LOGICAL_DECODING_STATE);
+		XLogInsert(RM_XLOG_ID, XLOG_LOGICAL_DECODING_STATUS);
 	}
 
-	UpdateLogicalDecodingState(false);
+	SpinLockAcquire(&(XLogLogicalInfoCtl->mutex));
+	XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_DISABLED;
+	SpinLockRelease(&(XLogLogicalInfoCtl->mutex));
 
 	LWLockRelease(ReplicationSlotAllocationLock);
 
-	PG_RETURN_BOOL(deactivated);
+	PG_RETURN_BOOL(true);
 }
 
 Datum
-pg_get_logical_decoding_state(PG_FUNCTION_ARGS)
+pg_get_logical_decoding_status(PG_FUNCTION_ARGS)
 {
-	LogicalDecodingState state;
-	const char *state_str = "unknown";
+	LogicalDecodingStatus status;
+	const char *status_str = "unknown";
 
 	SpinLockAcquire(&(XLogLogicalInfoCtl->mutex));
-	state = XLogLogicalInfoCtl->state;
+	status = XLogLogicalInfoCtl->status;
 	SpinLockRelease(&(XLogLogicalInfoCtl->mutex));
 
-	switch (state)
+	switch (status)
 	{
-		case LOGICAL_DECODING_STATE_DISABLED:
-			state_str = "disabled";
+		case LOGICAL_DECODING_STATUS_DISABLED:
+			status_str = "disabled";
 			break;
-		case LOGICAL_DECODING_STATE_XLOG_LOGICALINFO:
-			state_str = "xlog-logicalinfo";
+		case LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO:
+			status_str = "xlog-logicalinfo";
 			break;
-		case LOGICAL_DECODING_STATE_READY:
-			state_str = "ready";
+		case LOGICAL_DECODING_STATUS_READY:
+			status_str = "ready";
 			break;
 	}
 
-	PG_RETURN_TEXT_P(cstring_to_text(state_str));
+	PG_RETURN_TEXT_P(cstring_to_text(status_str));
 }
 

@@ -9,24 +9,24 @@
 #ifndef LOGICALXLOG_H
 #define LOGICALXLOG_H
 
-typedef enum LogicalDecodingState
+/*
+ * The status of WAL-logging logical info and logical decoding.
+ */
+typedef enum LogicalDecodingStatus
 {
-	LOGICAL_DECODING_STATE_DISABLED = 0,
-	LOGICAL_DECODING_STATE_XLOG_LOGICALINFO,
-	LOGICAL_DECODING_STATE_READY,
-} LogicalDecodingState;
+	LOGICAL_DECODING_STATUS_DISABLED = 0,
+	LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO,
+	LOGICAL_DECODING_STATUS_READY,
+} LogicalDecodingStatus;
 
 extern bool	XLogLogicalInfo;
 
 extern Size LogicalXlogShmemSize(void);
 extern void LogicalXlogShmemInit(void);
-extern void StartupLogicalDecodingState(bool enabled_at_last_checkpoint);
-extern bool ProcessBarrierUpdateLogicalInfo(void);
-extern bool IsXLogLogicalInfoActive(void);
+extern void StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint);
+extern bool XLogLogicalInfoEnabled(void);
 extern bool IsLogicalDecodingActive(void);
-extern void UpdateLogicalDecodingState(bool enabled);
-extern void EnsureLogicalDecodingActive(void);
-extern void ActivateLogicalDecoding(void);
+extern void UpdateLogicalDecodingStatus(bool enabled);
 
 #endif							/* LOGICALXLOG_H */
 

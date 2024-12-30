@@ -34,8 +34,6 @@ extern PGDLLIMPORT XLogRecPtr ProcLastRecPtr;
 extern PGDLLIMPORT XLogRecPtr XactLastRecEnd;
 extern PGDLLIMPORT XLogRecPtr XactLastCommitEnd;
 
-extern PGDLLIMPORT bool XLogLogicalInfo;
-
 /* these variables are GUC parameters related to XLOG */
 extern PGDLLIMPORT int wal_segment_size;
 extern PGDLLIMPORT int min_wal_size_mb;
@@ -126,7 +124,7 @@ extern PGDLLIMPORT int wal_level;
 #define XLogStandbyInfoActive() (wal_level >= WAL_LEVEL_REPLICA)
 
 /* Do we need to WAL-log information required only for logical replication? */
-#define XLogLogicalInfoActive() (IsXLogLogicalInfoActive())
+#define XLogLogicalInfoActive() (XLogLogicalInfoEnabled())
 
 #ifdef WAL_DEBUG
 extern PGDLLIMPORT bool XLOG_DEBUG;

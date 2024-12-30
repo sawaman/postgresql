@@ -11437,9 +11437,9 @@
   prosrc => 'pg_deactivate_logical_decoding' },
 { oid => '8978',
   descr => 'get the current logical decoding state',
-  proname => 'pg_get_logical_decoding_state', provolatile => 'v',
+  proname => 'pg_get_logical_decoding_status', provolatile => 'v',
   proparallel => 'u', prorettype => 'text', proargtypes => '',
-  prosrc => 'pg_get_logical_decoding_state' },
+  prosrc => 'pg_get_logical_decoding_status' },
 
 
 # event triggers

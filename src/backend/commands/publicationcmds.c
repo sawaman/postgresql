@@ -901,8 +901,8 @@ CreatePublication(ParseState *pstate, CreatePublicationStmt *stmt)
 	if (!XLogLogicalInfoActive())
 		ereport(WARNING,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("\"wal_level\" is insufficient to publish logical changes"),
-				 errhint("Set \"wal_level\" to \"logical\" before creating subscriptions.")));
+				 errmsg("logical decoding needs to be enabled to publish logical changes"),
+				 errhint("Set \"wal_level\" to \"logical\" or activate logical decoding before creating subscriptions.")));
 
 	return myself;
 }
