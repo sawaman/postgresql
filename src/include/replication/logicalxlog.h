@@ -17,9 +17,9 @@ typedef enum LogicalDecodingStatus
 	LOGICAL_DECODING_STATUS_DISABLED = 0,
 	LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO,
 	LOGICAL_DECODING_STATUS_READY,
-} LogicalDecodingStatus;
+}			LogicalDecodingStatus;
 
-extern bool	XLogLogicalInfo;
+extern bool XLogLogicalInfo;
 
 extern Size LogicalXlogShmemSize(void);
 extern void LogicalXlogShmemInit(void);
@@ -29,4 +29,3 @@ extern bool IsLogicalDecodingActive(void);
 extern void UpdateLogicalDecodingStatus(bool enabled);
 
 #endif							/* LOGICALXLOG_H */
-

@@ -33,8 +33,8 @@ typedef struct XLogLogicalInfoCtlData
 {
 	LogicalDecodingStatus status;
 	slock_t		mutex;
-	ConditionVariable		cv;
-} XLogLogicalInfoCtlData;
+	ConditionVariable cv;
+}			XLogLogicalInfoCtlData;
 XLogLogicalInfoCtlData *XLogLogicalInfoCtl = NULL;
 
 static void logical_decoding_activation_abort_callback(int code, Datum arg);
@@ -53,7 +53,7 @@ LogicalXlogShmemSize(void)
 void
 LogicalXlogShmemInit(void)
 {
-	bool	found;
+	bool		found;
 
 	XLogLogicalInfoCtl = ShmemInitStruct("Logical Info Logging",
 										 sizeof(XLogLogicalInfoCtlData),
@@ -87,9 +87,9 @@ StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 
 	/*
 	 * On standbys, we always start with the status in the last checkpoint
-	 * record. If changes of wal_level or logical decoding status is sent
-	 * from the primary, we will enable or disable the logical decoding
-	 * while replaying the WAL record and invalidate slots if necessary.
+	 * record. If changes of wal_level or logical decoding status is sent from
+	 * the primary, we will enable or disable the logical decoding while
+	 * replaying the WAL record and invalidate slots if necessary.
 	 */
 	if (!StandbyMode)
 	{
@@ -108,8 +108,8 @@ StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 			status = LOGICAL_DECODING_STATUS_DISABLED;
 
 		/*
-		 * Setting wal_level to 'logical' immediately enables logical
-		 * decoding and WAL-logging logical info.
+		 * Setting wal_level to 'logical' immediately enables logical decoding
+		 * and WAL-logging logical info.
 		 */
 		if (wal_level >= WAL_LEVEL_LOGICAL)
 			status = LOGICAL_DECODING_STATUS_READY;
@@ -128,26 +128,26 @@ UpdateLogicalDecodingStatus(bool activate)
 		: LOGICAL_DECODING_STATUS_DISABLED;
 }
 
-bool inline
+bool		inline
 XLogLogicalInfoEnabled(void)
 {
 	/*
-	 * Use volatile pointer to make sure we make a fresh read of
-	 * the shared variable.
+	 * Use volatile pointer to make sure we make a fresh read of the shared
+	 * variable.
 	 */
-	volatile XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
+	volatile	XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
 
 	return ctl->status >= LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO;
 }
 
-bool inline
+bool		inline
 IsLogicalDecodingActive(void)
 {
 	/*
-	 * Use volatile pointer to make sure we make a fresh read of
-	 * the shared variable.
+	 * Use volatile pointer to make sure we make a fresh read of the shared
+	 * variable.
 	 */
-	volatile XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
+	volatile	XLogLogicalInfoCtlData *ctl = XLogLogicalInfoCtl;
 
 	return ctl->status == LOGICAL_DECODING_STATUS_READY;
 }
@@ -155,7 +155,7 @@ IsLogicalDecodingActive(void)
 static void
 do_activate_logical_decoding(void)
 {
-	bool recoveryInProgress = RecoveryInProgress();
+	bool		recoveryInProgress = RecoveryInProgress();
 
 	if (max_replication_slots == 0)
 		return;
@@ -222,7 +222,7 @@ do_activate_logical_decoding(void)
 
 	if (XLogStandbyInfoActive() && !recoveryInProgress)
 	{
-		bool	enabled = true;
+		bool		enabled = true;
 
 		XLogBeginInsert();
 		XLogRegisterData((char *) (&enabled), sizeof(bool));
@@ -267,9 +267,9 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 		PG_RETURN_VOID();
 
 	/*
-	 * Get ready to sleep until the logical decoding gets activated.
-	 * We may end up not sleeping, but we don't want to do this while
-	 * holding the spinlock.
+	 * Get ready to sleep until the logical decoding gets activated. We may
+	 * end up not sleeping, but we don't want to do this while holding the
+	 * spinlock.
 	 */
 	ConditionVariablePrepareToSleep(&XLogLogicalInfoCtl->cv);
 
@@ -286,8 +286,8 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 		if (status == LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO)
 		{
 			/*
-			 * Someone has already started the activation process. Wait
-			 * for the activation to complete and check the status again.
+			 * Someone has already started the activation process. Wait for
+			 * the activation to complete and check the status again.
 			 */
 			ConditionVariableSleep(&XLogLogicalInfoCtl->cv,
 								   WAIT_EVENT_LOGICAL_DECODING_ACTIVATION);
@@ -307,8 +307,8 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 Datum
 pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 {
-	int	active_logical_slots = 0;
-	bool recoveryInProgress = RecoveryInProgress();
+	int			active_logical_slots = 0;
+	bool		recoveryInProgress = RecoveryInProgress();
 
 	LWLockAcquire(ReplicationSlotAllocationLock, LW_SHARED);
 
@@ -334,7 +334,7 @@ pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 
 	if (XLogStandbyInfoActive() && !recoveryInProgress)
 	{
-		bool	enabled = false;
+		bool		enabled = false;
 
 		XLogBeginInsert();
 		XLogRegisterData((char *) (&enabled), sizeof(bool));
@@ -376,4 +376,3 @@ pg_get_logical_decoding_status(PG_FUNCTION_ARGS)
 
 	PG_RETURN_TEXT_P(cstring_to_text(status_str));
 }
-
