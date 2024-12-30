@@ -19,6 +19,7 @@ typedef enum LogicalDecodingStatus
 	LOGICAL_DECODING_STATUS_READY,
 }			LogicalDecodingStatus;
 
+typedef struct XLogLogicalInfoCtlData XLogLogicalInfoCtlData;
 extern XLogLogicalInfoCtlData *XLogLogicalInfoCtl;
 extern bool XLogLogicalInfo;
 
