@@ -77,15 +77,9 @@ StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 	LogicalDecodingStatus status;
 
 	if (enabled_at_last_checkpoint)
-	{
-		elog(LOG, "XXX enabled from last checkpoint");
 		status = LOGICAL_DECODING_STATUS_READY;
-	}
 	else
-	{
-		elog(LOG, "XXX disabled from last checkpoint");
 		status = LOGICAL_DECODING_STATUS_DISABLED;
-	}
 
 	/*
 	 * On standbys, we always start with the status in the last checkpoint
