@@ -5436,7 +5436,6 @@ StartupXLOG(void)
 	bool		didCrash;
 	bool		haveTblspcMap;
 	bool		haveBackupLabel;
-	bool		logicalDecoding;
 	XLogRecPtr	EndOfLog;
 	TimeLineID	EndOfLogTLI;
 	TimeLineID	newTLI;
@@ -5601,7 +5600,6 @@ StartupXLOG(void)
 	 * Initialize logical decoding status, before initializing replication
 	 * slots.
 	 */
-	logicalDecoding = checkPoint.logicalDecoding;
 	StartupLogicalDecodingStatus(logicalDecoding);
 
 	/*
