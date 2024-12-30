@@ -1,7 +1,6 @@
 
 # Copyright (c) 2021-2024, PostgreSQL Global Development Group
 
-# Basic logical replication test
 use strict;
 use warnings FATAL => 'all';
 use PostgreSQL::Test::Cluster;
