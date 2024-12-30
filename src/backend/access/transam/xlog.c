@@ -5079,6 +5079,7 @@ BootStrapXLOG(uint32 data_checksum_version)
 	checkPoint.ThisTimeLineID = BootstrapTimeLineID;
 	checkPoint.PrevTimeLineID = BootstrapTimeLineID;
 	checkPoint.fullPageWrites = fullPageWrites;
+	checkPoint.logicalDecoding = false;
 	checkPoint.wal_level = wal_level;
 	checkPoint.nextXid =
 		FullTransactionIdFromEpochAndXid(0, FirstNormalTransactionId);
@@ -5435,6 +5436,7 @@ StartupXLOG(void)
 	bool		didCrash;
 	bool		haveTblspcMap;
 	bool		haveBackupLabel;
+	bool		logicalDecoding;
 	XLogRecPtr	EndOfLog;
 	TimeLineID	EndOfLogTLI;
 	TimeLineID	newTLI;
@@ -5599,7 +5601,8 @@ StartupXLOG(void)
 	 * Initialize logical decoding status, before initializing replication
 	 * slots.
 	 */
-	StartupLogicalDecodingStatus(checkPoint.logicalDecoding);
+	logicalDecoding = checkPoint.logicalDecoding;
+	StartupLogicalDecodingStatus(logicalDecoding);
 
 	/*
 	 * Initialize replication slots, before there's a chance to remove

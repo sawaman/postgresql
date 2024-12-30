@@ -19,6 +19,7 @@ typedef enum LogicalDecodingStatus
 	LOGICAL_DECODING_STATUS_READY,
 }			LogicalDecodingStatus;
 
+extern XLogLogicalInfoCtlData *XLogLogicalInfoCtl;
 extern bool XLogLogicalInfo;
 
 extern Size LogicalXlogShmemSize(void);
