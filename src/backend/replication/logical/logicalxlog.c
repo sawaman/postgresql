@@ -118,8 +118,6 @@ StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 	XLogLogicalInfoCtl->status = status;
 }
 
-/*
- */
 void
 UpdateLogicalDecodingStatus(bool activate)
 {
@@ -128,7 +126,10 @@ UpdateLogicalDecodingStatus(bool activate)
 		: LOGICAL_DECODING_STATUS_DISABLED;
 }
 
-bool		inline
+/*
+ * Is WAL-Logging logical info enabled?
+ */
+bool inline
 XLogLogicalInfoEnabled(void)
 {
 	/*
@@ -140,7 +141,10 @@ XLogLogicalInfoEnabled(void)
 	return ctl->status >= LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO;
 }
 
-bool		inline
+/*
+ * Is logical decoding active?
+ */
+bool inline
 IsLogicalDecodingActive(void)
 {
 	/*

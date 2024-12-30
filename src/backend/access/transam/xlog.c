@@ -8599,11 +8599,7 @@ xlog_redo(XLogReaderState *record)
 
 		/*
 		 * Invalidate logical slots if we are in hot standby and the primary
-		 * does not have a WAL level sufficient for logical decoding. No need
-		 * to search for potentially conflicting logically slots if standby is
-		 * running with wal_level lower than logical, because in that case, we
-		 * would have either disallowed creation of logical slots or
-		 * invalidated existing ones.
+		 * disables the logical decoding.
 		 */
 		if (InRecovery && InHotStandby &&
 			IsLogicalDecodingActive() &&
