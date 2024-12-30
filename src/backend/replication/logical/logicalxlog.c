@@ -161,15 +161,6 @@ do_activate_logical_decoding(void)
 {
 	bool		recoveryInProgress = RecoveryInProgress();
 
-	if (max_replication_slots == 0)
-		return;
-
-	if (IsTransactionState() &&
-		GetTopTransactionIdIfAny() != InvalidTransactionId)
-		ereport(ERROR,
-				(errcode(ERRCODE_ACTIVE_SQL_TRANSACTION),
-				 errmsg("cannot activate logical decoding in transaction that has performed writes")));
-
 	/*
 	 * Get the latest status of logical info logging. If it's already
 	 * activated, quick return.
@@ -181,9 +172,7 @@ do_activate_logical_decoding(void)
 		return;
 	}
 
-	/*
-	 * Activate the logical info logging first.
-	 */
+	/* Activate the logical info logging */
 	XLogLogicalInfoCtl->status = LOGICAL_DECODING_STATUS_XLOG_LOGICALINFO;
 	SpinLockRelease(&XLogLogicalInfoCtl->mutex);
 
@@ -259,9 +248,17 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 	if (max_replication_slots == 0)
 		ereport(LOG,
 				(errmsg("logical decoding can only be activated if \"max_replication_slots\" > 0")));
+
 	if (wal_level < WAL_LEVEL_REPLICA)
 		ereport(LOG,
 				(errmsg("logical decoding can only be activated if \"wal_level\" >= \"replica\"")));
+
+	if (IsTransactionState() &&
+		GetTopTransactionIdIfAny() != InvalidTransactionId)
+		ereport(ERROR,
+				(errcode(ERRCODE_ACTIVE_SQL_TRANSACTION),
+				 errmsg("cannot activate logical decoding in transaction that has performed writes")));
+
 
 	SpinLockAcquire(&(XLogLogicalInfoCtl->mutex));
 	status = XLogLogicalInfoCtl->status;
@@ -311,9 +308,13 @@ pg_activate_logical_decoding(PG_FUNCTION_ARGS)
 Datum
 pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 {
-	int			active_logical_slots = 0;
+	int			valid_logical_slots = 0;
 	bool		recoveryInProgress = RecoveryInProgress();
 
+	/*
+	 * Hold ReplicationSlotAllocationLock to prevent slots from newly
+	 * being created while deactivating the logical decoding.
+	 */
 	LWLockAcquire(ReplicationSlotAllocationLock, LW_SHARED);
 
 	for (int i = 0; i < max_replication_slots; i++)
@@ -329,10 +330,10 @@ pg_deactivate_logical_decoding(PG_FUNCTION_ARGS)
 		if (s->data.invalidated != RS_INVAL_NONE)
 			continue;
 
-		active_logical_slots++;
+		valid_logical_slots++;
 	}
 
-	if (active_logical_slots > 0)
+	if (valid_logical_slots > 0)
 		ereport(ERROR,
 				(errmsg("cannot deactivate logical decoding while having valid logical replication slots")));
 
