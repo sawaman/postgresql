@@ -1042,7 +1042,7 @@ ValidateSlotSyncParams(int elevel)
 	 * Since altering the wal_level requires a server restart, so error out in
 	 * this case regardless of elevel provided by caller.
 	 */
-	if (wal_level < WAL_LEVEL_LOGICAL)
+	if (XLogLogicalInfoActive())
 		ereport(ERROR,
 				errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				errmsg("replication slot synchronization requires \"wal_level\" >= \"logical\""));

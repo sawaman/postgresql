@@ -41,6 +41,7 @@
 #include "postmaster/autovacuum.h"
 #include "replication/slotsync.h"
 #include "replication/syncrep.h"
+#include "replication/logicalxlog.h"
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
 #include "storage/lmgr.h"

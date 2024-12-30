@@ -23,6 +23,7 @@
 #include "pgstat.h"
 #include "port/pg_bitutils.h"
 #include "replication/logicalworker.h"
+#include "replication/logicalxlog.h"
 #include "replication/walsender.h"
 #include "storage/condition_variable.h"
 #include "storage/ipc.h"
@@ -572,6 +573,9 @@ ProcessProcSignalBarrier(void)
 				{
 					case PROCSIGNAL_BARRIER_SMGRRELEASE:
 						processed = ProcessBarrierSmgrRelease();
+						break;
+					case PROCSIGNAL_BARRIER_UPDATELOGICALINFO:
+						processed = ProcessBarrierUpdateLogicalInfo();
 						break;
 				}
 

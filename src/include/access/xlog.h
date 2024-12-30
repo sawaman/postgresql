@@ -14,6 +14,7 @@
 #include "access/xlogbackup.h"
 #include "access/xlogdefs.h"
 #include "datatype/timestamp.h"
+#include "replication/logicalxlog.h"
 #include "lib/stringinfo.h"
 #include "nodes/pg_list.h"
 
@@ -32,6 +33,8 @@ extern PGDLLIMPORT int wal_sync_method;
 extern PGDLLIMPORT XLogRecPtr ProcLastRecPtr;
 extern PGDLLIMPORT XLogRecPtr XactLastRecEnd;
 extern PGDLLIMPORT XLogRecPtr XactLastCommitEnd;
+
+extern PGDLLIMPORT bool XLogLogicalInfo;
 
 /* these variables are GUC parameters related to XLOG */
 extern PGDLLIMPORT int wal_segment_size;
@@ -123,7 +126,7 @@ extern PGDLLIMPORT int wal_level;
 #define XLogStandbyInfoActive() (wal_level >= WAL_LEVEL_REPLICA)
 
 /* Do we need to WAL-log information required only for logical replication? */
-#define XLogLogicalInfoActive() (wal_level >= WAL_LEVEL_LOGICAL)
+#define XLogLogicalInfoActive() (IsXLogLogicalInfoActive())
 
 #ifdef WAL_DEBUG
 extern PGDLLIMPORT bool XLOG_DEBUG;

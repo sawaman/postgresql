@@ -32,6 +32,7 @@
 #include "postmaster/bgwriter.h"
 #include "postmaster/walsummarizer.h"
 #include "replication/logicallauncher.h"
+#include "replication/logicalxlog.h"
 #include "replication/origin.h"
 #include "replication/slot.h"
 #include "replication/slotsync.h"
@@ -148,6 +149,7 @@ CalculateShmemSize(int *num_semaphores)
 	size = add_size(size, WaitEventCustomShmemSize());
 	size = add_size(size, InjectionPointShmemSize());
 	size = add_size(size, SlotSyncShmemSize());
+	size = add_size(size, LogicalXlogShmemSize());
 
 	/* include additional requested shmem from preload libraries */
 	size = add_size(size, total_addin_request);
@@ -330,6 +332,7 @@ CreateOrAttachShmemStructs(void)
 	PgArchShmemInit();
 	ApplyLauncherShmemInit();
 	SlotSyncShmemInit();
+	LogicalXlogShmemInit();
 
 	/*
 	 * Set up other modules that need some shared memory space

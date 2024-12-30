@@ -40,6 +40,7 @@ typedef struct CheckPoint
 	TimeLineID	PrevTimeLineID; /* previous TLI, if this record begins a new
 								 * timeline (equals ThisTimeLineID otherwise) */
 	bool		fullPageWrites; /* current full_page_writes */
+	bool		logicalDecoding;	/* true if logical decoding is enabled */
 	int			wal_level;		/* current wal_level */
 	FullTransactionId nextXid;	/* next free transaction ID */
 	Oid			nextOid;		/* next free OID */
@@ -80,6 +81,7 @@ typedef struct CheckPoint
 /* 0xC0 is used in Postgres 9.5-11 */
 #define XLOG_OVERWRITE_CONTRECORD		0xD0
 #define XLOG_CHECKPOINT_REDO			0xE0
+#define XLOG_LOGICAL_DECODING_STATE		0xF0
 
 
 /*

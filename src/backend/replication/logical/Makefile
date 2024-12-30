@@ -21,6 +21,7 @@ OBJS = \
 	launcher.o \
 	logical.o \
 	logicalfuncs.o \
+	logicalxlog.o \
 	message.o \
 	origin.o \
 	proto.o \

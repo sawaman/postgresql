@@ -35,6 +35,7 @@
 #include "pgstat.h"
 #include "replication/decode.h"
 #include "replication/logical.h"
+#include "replication/logicalxlog.h"
 #include "replication/reorderbuffer.h"
 #include "replication/slotsync.h"
 #include "replication/snapbuild.h"
@@ -115,7 +116,7 @@ CheckLogicalDecodingRequirements(void)
 	 * needs the same check.
 	 */
 
-	if (wal_level < WAL_LEVEL_LOGICAL)
+	if (!XLogLogicalInfoActive())
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("logical decoding requires \"wal_level\" >= \"logical\"")));
@@ -138,7 +139,7 @@ CheckLogicalDecodingRequirements(void)
 		if (GetActiveWalLevelOnStandby() < WAL_LEVEL_LOGICAL)
 			ereport(ERROR,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("logical decoding on standby requires \"wal_level\" >= \"logical\" on the primary")));
+					 errmsg("logical decoding on standby requires to enable logical decoding on the primary")));
 	}
 }
 

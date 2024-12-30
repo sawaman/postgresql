@@ -78,6 +78,7 @@
 #include "postmaster/walsummarizer.h"
 #include "postmaster/walwriter.h"
 #include "replication/origin.h"
+#include "replication/logicalxlog.h"
 #include "replication/slot.h"
 #include "replication/snapbuild.h"
 #include "replication/walreceiver.h"
@@ -5594,6 +5595,8 @@ StartupXLOG(void)
 	 */
 	RelationCacheInitFileRemove();
 
+	StartupLogicalDecodingState(checkPoint.logicalDecoding);
+
 	/*
 	 * Initialize replication slots, before there's a chance to remove
 	 * required resources.
@@ -7002,6 +7005,7 @@ CreateCheckPoint(int flags)
 
 	checkPoint.fullPageWrites = Insert->fullPageWrites;
 	checkPoint.wal_level = wal_level;
+	checkPoint.logicalDecoding = IsLogicalDecodingActive();
 
 	if (shutdown)
 	{
@@ -8582,6 +8586,29 @@ xlog_redo(XLogReaderState *record)
 	else if (info == XLOG_CHECKPOINT_REDO)
 	{
 		/* nothing to do here, just for informational purposes */
+	}
+	else if (info == XLOG_LOGICAL_DECODING_STATE)
+	{
+		bool		enabled;
+
+		memcpy(&enabled, XLogRecGetData(record), sizeof(bool));
+
+		/*
+		 * Invalidate logical slots if we are in hot standby and the primary
+		 * does not have a WAL level sufficient for logical decoding. No need
+		 * to search for potentially conflicting logically slots if standby is
+		 * running with wal_level lower than logical, because in that case, we
+		 * would have either disallowed creation of logical slots or
+		 * invalidated existing ones.
+		 */
+		if (InRecovery && InHotStandby &&
+			IsLogicalDecodingActive() &&
+			!enabled)
+			InvalidateObsoleteReplicationSlots(RS_INVAL_WAL_LEVEL,
+											   0, InvalidOid,
+											   InvalidTransactionId);
+
+		UpdateLogicalDecodingState(enabled);
 	}
 }
 

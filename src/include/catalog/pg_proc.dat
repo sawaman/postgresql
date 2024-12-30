@@ -11425,6 +11425,22 @@
   proname => 'pg_sync_replication_slots', provolatile => 'v',
   proparallel => 'u', prorettype => 'void', proargtypes => '',
   prosrc => 'pg_sync_replication_slots' },
+{ oid => '8976',
+  descr => 'enable both logical info WAL-logging and logical decoding facility',
+  proname => 'pg_activate_logical_decoding', provolatile => 'v',
+  proparallel => 'u', prorettype => 'void', proargtypes => '',
+  prosrc => 'pg_activate_logical_decoding' },
+{ oid => '8977',
+  descr => 'deactivate logical decoding facility',
+  proname => 'pg_deactivate_logical_decoding', provolatile => 'v',
+  proparallel => 'u', prorettype => 'bool', proargtypes => '',
+  prosrc => 'pg_deactivate_logical_decoding' },
+{ oid => '8978',
+  descr => 'get the current logical decoding state',
+  proname => 'pg_get_logical_decoding_state', provolatile => 'v',
+  proparallel => 'u', prorettype => 'text', proargtypes => '',
+  prosrc => 'pg_get_logical_decoding_state' },
+
 
 # event triggers
 { oid => '3566', descr => 'list objects dropped by the current command',

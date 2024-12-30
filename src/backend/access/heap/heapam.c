@@ -8894,8 +8894,7 @@ log_heap_update(Relation reln, Buffer oldbuf,
 /*
  * Perform XLogInsert of an XLOG_HEAP2_NEW_CID record
  *
- * This is only used in wal_level >= WAL_LEVEL_LOGICAL, and only for catalog
- * tuples.
+ * This is only used when LogicalLogging is enabled, and only for catalog tuples.
  */
 static XLogRecPtr
 log_heap_new_cid(Relation relation, HeapTuple tup)

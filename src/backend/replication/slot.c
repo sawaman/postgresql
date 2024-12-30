@@ -50,6 +50,7 @@
 #include "replication/slotsync.h"
 #include "replication/slot.h"
 #include "replication/walsender_private.h"
+#include "replication/logicalxlog.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/proc.h"
@@ -2355,12 +2356,12 @@ RestoreSlotFromDisk(const char *name)
 	 * NB: Changing the requirements here also requires adapting
 	 * CheckSlotRequirements() and CheckLogicalDecodingRequirements().
 	 */
-	if (cp.slotdata.database != InvalidOid && wal_level < WAL_LEVEL_LOGICAL)
+	if (cp.slotdata.database != InvalidOid && !XLogLogicalInfoActive())
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("logical replication slot \"%s\" exists, but \"wal_level\" < \"logical\"",
 						NameStr(cp.slotdata.name)),
-				 errhint("Change \"wal_level\" to be \"logical\" or higher.")));
+				 errhint("Change \"wal_level\" to be \"logical\" or higher, or activate logical decoding with \"replica\".")));
 	else if (wal_level < WAL_LEVEL_REPLICA)
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
