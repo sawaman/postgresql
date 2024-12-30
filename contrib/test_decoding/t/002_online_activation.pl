@@ -14,6 +14,9 @@ $node->append_conf('postgresql.conf', 'synchronous_commit = on');
 $node->start;
 
 my ($ret, $stdout, $stderr);
+$ret = $node->safe_psql('postgres', 'show wal_level');
+print $ret;
+
 $ret = $node->safe_psql('postgres', 'SELECT pg_get_logical_decoding_status()');
 is($ret, 'disabled', 'logical decoding must be disabled');
 
