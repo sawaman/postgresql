@@ -76,10 +76,6 @@ StartupLogicalDecodingStatus(bool enabled_at_last_checkpoint)
 {
 	LogicalDecodingStatus status;
 
-	elog(LOG, "XXX logical dec was enabled? %d, wal_level %d",
-		 enabled_at_last_checkpoint,
-		 wal_level);
-
 	if (enabled_at_last_checkpoint)
 		status = LOGICAL_DECODING_STATUS_READY;
 	else
