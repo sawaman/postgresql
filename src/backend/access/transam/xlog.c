@@ -5600,7 +5600,7 @@ StartupXLOG(void)
 	 * Initialize logical decoding status, before initializing replication
 	 * slots.
 	 */
-	StartupLogicalDecodingStatus(logicalDecoding);
+	StartupLogicalDecodingStatus(checkPoint.logicalDecoding);
 
 	/*
 	 * Initialize replication slots, before there's a chance to remove
